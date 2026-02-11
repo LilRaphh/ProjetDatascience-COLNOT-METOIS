@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-datascientist-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Hot-reload: on monte tout le dossier API (main.py + app/)
+      - ./API:/code/API
+      # Stockage
+      - ./models:/code/models
+      - ./data:/code/data
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    restart: unless-stopped
+
+  jupyter:
+    image: jupyter/datascience-notebook:latest
+    container_name: jupyter-datascientist-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./data:/home/jovyan/data
+    environment:
+      - ENVIRONMENT=development
+    command: >
+      jupyter notebook
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    container_name: fastapi-datascientist-web
+    ports:
+      - "8088:80"
+    volumes:
+      - ./web-interface:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
