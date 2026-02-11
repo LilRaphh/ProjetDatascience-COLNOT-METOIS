@@ -1,20 +1,26 @@
 """
-Application FastAPI - Projet Data Science en 5 phases
+Application FastAPI - Projet Data Science
 Point d'entrée principal
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-# Créer l'application FastAPI
+# 👇 Import du router dataset
+from app.routers.dataset import router as dataset_router
+
+
+# ============================================================
+# =================== CREATION APPLICATION ===================
+# ============================================================
+
 app = FastAPI(
     title="Data Science - Projet Final",
     description="""
     Système de décision de trading GBP/USD   
 
     **Auteur** : Raphaël COLNOT & Clément MÉTOIS  
-    **Durée** : 2 jours
+    **Durée** : 2 jours  
     **Date de début** : 11 février 2026
     """,
     version="1.0.0",
@@ -22,7 +28,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configuration CORS (pour permettre les requêtes depuis un frontend)
+
+# ============================================================
+# ======================= MIDDLEWARE =========================
+# ============================================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,11 +41,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ============================================================
+# ======================= ROUTERS ============================
+# ============================================================
+
+# 👇 Ajout du router dataset
+app.include_router(dataset_router)
+
+
+# ============================================================
+# ======================== ENDPOINTS =========================
+# ============================================================
+
 @app.get("/", tags=["Root"])
 def root():
-    """
-    Endpoint racine - Informations sur l'API
-    """
     return {
         "message": "Bienvenue sur l'API FastAPI Data Science !",
         "version": "1.0.0",
@@ -45,12 +65,13 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    """
-    Health check endpoint
-    """
     return {"status": "healthy", "service": "fastapi-datascientist-api"}
 
 
+# ============================================================
+# ====================== LANCEMENT LOCAL =====================
+# ============================================================
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
