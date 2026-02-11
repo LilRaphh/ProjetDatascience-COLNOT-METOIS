@@ -4,11 +4,10 @@ from __future__ import annotations
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
 from app.schemas.dataset import BaseResponse, LoadParams, LoadResult, Meta
 
@@ -18,8 +17,6 @@ router = APIRouter(prefix="/dataset", tags=["dataset"])
 # Config
 # ---------------------------------------------------------------------
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
-FILENAME_PATTERN = "DAT_MT_{pair}_{timeframe}_{year}.csv"
-
 EXPECTED_COLS = ["Date", "Time", "Open", "High", "Low", "Close", "Volume"]
 
 # ---------------------------------------------------------------------
@@ -33,13 +30,23 @@ def _make_dataset_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
-def _resolve_csv_path(pair: str, timeframe: str, year: int) -> Path:
-    filename = FILENAME_PATTERN.format(
-        pair=pair.upper(),
-        timeframe=timeframe.upper(),
-        year=year
-    )
-    return DATA_DIR / filename
+def _resolve_csv_path(year: int) -> Path:
+    """
+    Retourne le premier fichier CSV dans DATA_DIR contenant l'année dans son nom.
+    Exemple: *2022*.csv
+    """
+    if not DATA_DIR.exists():
+        raise HTTPException(status_code=404, detail=f"Dossier data introuvable: {DATA_DIR.resolve()}")
+
+    files = sorted(DATA_DIR.glob(f"*{year}*.csv"))
+
+    if not files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Aucun fichier CSV trouvé dans '{DATA_DIR.resolve()}' pour l'année {year}",
+        )
+
+    return files[0]
 
 
 def _load_raw_m1_csv(csv_path: Path) -> pd.DataFrame:
@@ -49,22 +56,17 @@ def _load_raw_m1_csv(csv_path: Path) -> pd.DataFrame:
     - Gestion automatique si CSV sans header
     - Ajout colonne timestamp
     """
-
     if not csv_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Fichier introuvable : {csv_path}"
-        )
+        raise HTTPException(status_code=404, detail=f"Fichier introuvable : {csv_path}")
 
-    # Tentative normale
+    # Tentative normale (header présent)
     df = pd.read_csv(csv_path)
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Si les colonnes attendues ne sont pas présentes -> CSV sans header
+    # Si pas de header => la 1ère ligne est prise comme colonnes
     if not set(EXPECTED_COLS).issubset(set(df.columns)):
         df = pd.read_csv(csv_path, header=None, names=EXPECTED_COLS)
 
-    # Sécurisation noms
     df.columns = [str(c).strip() for c in df.columns]
 
     missing = [c for c in EXPECTED_COLS if c not in df.columns]
@@ -80,13 +82,10 @@ def _load_raw_m1_csv(csv_path: Path) -> pd.DataFrame:
 
     # Ajout timestamp
     ts = pd.to_datetime(
-        df["Date"].astype(str).str.strip()
-        + " "
-        + df["Time"].astype(str).str.strip(),
+        df["Date"].astype(str).str.strip() + " " + df["Time"].astype(str).str.strip(),
         format="%Y.%m.%d %H:%M",
         errors="coerce",
     )
-
     df.insert(0, "timestamp", ts)
 
     return df
@@ -102,7 +101,6 @@ def _regularity_report(df: pd.DataFrame) -> Dict[str, Any]:
 
     dt = s.diff().dropna()
     seconds = dt.dt.total_seconds().astype("int64")
-
     pct_60 = float((seconds == 60).mean())
 
     return {
@@ -113,23 +111,19 @@ def _regularity_report(df: pd.DataFrame) -> Dict[str, Any]:
         "is_regular_1min": bool(pct_60 >= 0.95),
     }
 
+
 # ---------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------
 @router.post("/load_m1", response_model=BaseResponse)
 def load_m1(request: LoadParams) -> BaseResponse:
-
-    csv_path = _resolve_csv_path(request.pair, request.timeframe, request.year)
+    csv_path = _resolve_csv_path(request.year)
     df = _load_raw_m1_csv(csv_path)
 
-    dataset_id = _make_dataset_id(
-        f"m1_{request.pair.upper()}_{request.year}"
-    )
+    dataset_id = _make_dataset_id(f"m1_{request.year}")
 
     _DATASETS[dataset_id] = df
     _DATASETS_META[dataset_id] = {
-        "pair": request.pair.upper(),
-        "timeframe": request.timeframe.upper(),
         "year": request.year,
         "file_path": str(csv_path),
         "raw": True,
@@ -143,20 +137,15 @@ def load_m1(request: LoadParams) -> BaseResponse:
         regularity=_regularity_report(df),
     )
 
-    return BaseResponse(
-        meta=Meta(dataset_id=dataset_id),
-        result=result.model_dump(),
-    )
+    return BaseResponse(meta=Meta(dataset_id=dataset_id), result=result.model_dump())
 
 
 @router.get("/{dataset_id}/info", response_model=BaseResponse)
 def dataset_info(dataset_id: str) -> BaseResponse:
-
     if dataset_id not in _DATASETS:
         raise HTTPException(status_code=404, detail="dataset_id not found")
 
     df = _DATASETS[dataset_id]
-
     info = {
         "meta": _DATASETS_META.get(dataset_id, {}),
         "shape": (int(df.shape[0]), int(df.shape[1])),
@@ -164,22 +153,13 @@ def dataset_info(dataset_id: str) -> BaseResponse:
         "null_counts": {c: int(df[c].isna().sum()) for c in df.columns},
         "timestamp_report": _regularity_report(df),
     }
-
     return BaseResponse(meta=Meta(dataset_id=dataset_id), result=info)
 
 
 @router.get("/{dataset_id}/sample", response_model=BaseResponse)
-def dataset_sample(
-    dataset_id: str,
-    n: int = Query(20, ge=1, le=500)
-) -> BaseResponse:
-
+def dataset_sample(dataset_id: str, n: int = Query(20, ge=1, le=500)) -> BaseResponse:
     if dataset_id not in _DATASETS:
         raise HTTPException(status_code=404, detail="dataset_id not found")
 
     df = _DATASETS[dataset_id]
-
-    return BaseResponse(
-        meta=Meta(dataset_id=dataset_id),
-        result={"n": n, "data": df.head(n).to_dict(orient="records")},
-    )
+    return BaseResponse(meta=Meta(dataset_id=dataset_id), result={"n": n, "data": df.head(n).to_dict(orient="records")})

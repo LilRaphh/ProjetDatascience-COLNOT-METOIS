@@ -15,10 +15,8 @@ class LoadParams(BaseModel):
         ...,
         ge=2022,
         le=2025,
-        description="Année du fichier à charger (ex: 2022)",
+        description="Année du fichier à charger (ex: 2022)"
     )
-    pair: str = Field("GBPUSD")
-    timeframe: str = Field("M1")
 
 
 class LoadResult(BaseModel):
