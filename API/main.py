@@ -10,6 +10,8 @@ from app.routers.clean import router as clean_router
 
 from app.routers.dataset import router as dataset_router
 
+from app.routers import m15
+
 
 # ============================================================
 # =================== CREATION APPLICATION ===================
@@ -50,6 +52,7 @@ app.add_middleware(
 # 👇 Ajout des différents routers 
 app.include_router(dataset_router)
 app.include_router(clean_router)
+app.include_router(m15.router)
 
 
 # ============================================================
