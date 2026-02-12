@@ -216,10 +216,3 @@ class CleanService:
         quality_after = self.generate_quality_report(df2)
 
         return df2.reset_index(drop=True), counters, quality_after
-
-
-# ============================================================
-# ================= INSTANCE GLOBALE =========================
-# ============================================================
-
-clean_service = CleanService()

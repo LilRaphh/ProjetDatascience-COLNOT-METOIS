@@ -94,5 +94,3 @@ class M1ImportService:
             "pct_exact_60s": pct_60,
             "is_regular_1min": bool(pct_60 >= REGULARITY_PCT_THRESHOLD),
         }
-
-m1_import_service = M1ImportService()

@@ -105,6 +105,3 @@ class M15CleanService:
         report["dropped_total"] = int(report["input_rows"] - report["output_rows"])
 
         return df.reset_index(drop=True), report
-
-
-m15_clean_service = M15CleanService()

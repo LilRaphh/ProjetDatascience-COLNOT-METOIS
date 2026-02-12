@@ -108,6 +108,3 @@ class M15AggregationService:
         )
 
         return df_15, report
-
-
-m15_aggregation_service = M15AggregationService()
