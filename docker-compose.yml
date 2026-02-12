@@ -17,6 +17,8 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=info
+      - DATA_DIR=/code/data
+
     restart: unless-stopped
 
   jupyter:

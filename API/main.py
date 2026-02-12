@@ -6,7 +6,8 @@ Point d'entrée principal
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# 👇 Import du router dataset
+from app.routers.clean import router as clean_router
+
 from app.routers.dataset import router as dataset_router
 
 
@@ -46,8 +47,9 @@ app.add_middleware(
 # ======================= ROUTERS ============================
 # ============================================================
 
-# 👇 Ajout du router dataset
+# 👇 Ajout des différents routers 
 app.include_router(dataset_router)
+app.include_router(clean_router)
 
 
 # ============================================================

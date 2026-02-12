@@ -1,67 +1,47 @@
-# app/routers/dataset.py
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import HTTPException
 
-from app.schemas.dataset import BaseResponse, LoadParams, LoadResult, Meta
+from app.config import (
+    DATA_DIR, EXPECTED_COLS, NUMERIC_COLS,
+    DATETIME_FORMAT, REGULARITY_PCT_THRESHOLD
+)
 
-# ---------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------
-DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
-EXPECTED_COLS = ["Date", "Time", "Open", "High", "Low", "Close", "Volume"]
-
-# ---------------------------------------------------------------------
-# Stockage mémoire
-# ---------------------------------------------------------------------
-_DATASETS: Dict[str, pd.DataFrame] = {}
-_DATASETS_META: Dict[str, Dict[str, Any]] = {}
-
-class dataset:
-    def _make_dataset_id(prefix: str) -> str:
+class M1ImportService:
+    @staticmethod
+    def make_dataset_id(prefix: str) -> str:
         return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
-
-    def _resolve_csv_path(year: int) -> Path:
-        """
-        Retourne le premier fichier CSV dans DATA_DIR contenant l'année dans son nom.
-        Exemple: *2022*.csv
-        """
+    @staticmethod
+    def resolve_csv_path(year: int) -> Path:
         if not DATA_DIR.exists():
-            raise HTTPException(status_code=404, detail=f"Dossier data introuvable: {DATA_DIR.resolve()}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dossier data introuvable: {DATA_DIR.resolve()}",
+            )
 
         files = sorted(DATA_DIR.glob(f"*{year}*.csv"))
-
         if not files:
             raise HTTPException(
                 status_code=404,
                 detail=f"Aucun fichier CSV trouvé dans '{DATA_DIR.resolve()}' pour l'année {year}",
             )
-
         return files[0]
 
-
-    def _load_raw_m1_csv(csv_path: Path) -> pd.DataFrame:
-        """
-        Chargement RAW :
-        - Aucun nettoyage
-        - Gestion automatique si CSV sans header
-        - Ajout colonne timestamp
-        """
+    @staticmethod
+    def load_raw_m1_csv(csv_path: Path) -> pd.DataFrame:
         if not csv_path.exists():
             raise HTTPException(status_code=404, detail=f"Fichier introuvable : {csv_path}")
 
-        # Tentative normale (header présent)
         df = pd.read_csv(csv_path)
         df.columns = [str(c).strip() for c in df.columns]
 
-        # Si pas de header => la 1ère ligne est prise comme colonnes
+        # fallback si pas de header
         if not set(EXPECTED_COLS).issubset(set(df.columns)):
             df = pd.read_csv(csv_path, header=None, names=EXPECTED_COLS)
 
@@ -74,22 +54,20 @@ class dataset:
                 detail=f"Colonnes manquantes dans le CSV: {missing}. Colonnes trouvées: {list(df.columns)}",
             )
 
-        # Cast numérique (sans suppression de NaN)
-        for c in ["Open", "High", "Low", "Close", "Volume"]:
+        for c in NUMERIC_COLS:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-        # Ajout timestamp
         ts = pd.to_datetime(
             df["Date"].astype(str).str.strip() + " " + df["Time"].astype(str).str.strip(),
-            format="%Y.%m.%d %H:%M",
+            format=DATETIME_FORMAT,
             errors="coerce",
         )
         df.insert(0, "timestamp", ts)
 
         return df
 
-
-    def _regularity_report(df: pd.DataFrame) -> Dict[str, Any]:
+    @staticmethod
+    def regularity_report(df: pd.DataFrame) -> Dict[str, Any]:
         if "timestamp" not in df.columns:
             return {"has_timestamp": False}
 
@@ -106,5 +84,7 @@ class dataset:
             "min_ts": s.min().isoformat(),
             "max_ts": s.max().isoformat(),
             "pct_exact_60s": pct_60,
-            "is_regular_1min": bool(pct_60 >= 0.95),
+            "is_regular_1min": bool(pct_60 >= REGULARITY_PCT_THRESHOLD),
         }
+
+m1_import_service = M1ImportService()
