@@ -1,6 +1,7 @@
 import traceback
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
+from app.schemas.dataset import M15AggregateParams, M15CleanParams
 from app.services.m15_clean_service import M15CleanService
 
 
@@ -13,8 +14,9 @@ m15_aggregation_service = M15AggregationService()
 m15_clean_service = M15CleanService()
 
 @router.post("/aggregate")
-def aggregate_m1_to_m15(dataset_id: str):
+def aggregate_m1_to_m15(request: M15AggregateParams):
     try:
+        dataset_id = request.dataset_id
         if not dataset_store.exists(dataset_id):
             raise HTTPException(status_code=404, detail="Dataset introuvable")
 
@@ -41,12 +43,12 @@ def aggregate_m1_to_m15(dataset_id: str):
 
 
 @router.post("/clean")
-def clean_m15(
-    dataset_id: str,
-    gap_return_threshold: float = Query(0.02, ge=0.0, le=0.5),
-    drop_gaps: bool = Query(True),
-):
+def clean_m15(request: M15CleanParams):
     try:
+        dataset_id = request.dataset_id
+        gap_return_threshold = request.gap_return_threshold
+        drop_gaps = request.drop_gaps
+        
         if not dataset_store.exists(dataset_id):
             raise HTTPException(status_code=404, detail=f"Dataset introuvable: {dataset_id}")
 
