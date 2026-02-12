@@ -1,14 +1,16 @@
 import traceback
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services.m15_clean_service import m15_clean_service
+from app.services.m15_clean_service import M15CleanService
 
 
 from app.repositories.dataset_store import dataset_store
-from app.services.m15_aggregation_service import m15_aggregation_service
+from app.services.m15_aggregation_service import M15AggregationService
 
 router = APIRouter(prefix="/m15", tags=["M15"])
 
+m15_aggregation_service = M15AggregationService()
+m15_clean_service = M15CleanService()
 
 @router.post("/aggregate")
 def aggregate_m1_to_m15(dataset_id: str):

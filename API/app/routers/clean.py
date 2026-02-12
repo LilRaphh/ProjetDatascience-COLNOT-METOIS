@@ -19,10 +19,11 @@ from app.schemas.clean import (
     CleanTransformResult,
 )
 from app.schemas.common import BaseResponse, ResponseMeta, ResponseReport
-from app.services.clean_service import clean_service
+from app.services.clean_service import CleanService
 
 router = APIRouter(prefix="/clean", tags=["clean"])
 
+clean_service = CleanService()
 
 @router.post("/fit", response_model=BaseResponse)
 async def clean_fit(dataset_id: str, params: CleanFitParams):

@@ -6,11 +6,12 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.dataset import BaseResponse, LoadParams, LoadResult, Meta
-from app.services.m1_import_service import m1_import_service
+from app.services.m1_import_service import M1ImportService
 from app.repositories.dataset_store import dataset_store
 
 router = APIRouter(prefix="/dataset", tags=["dataset"])
 
+m1_import_service = M1ImportService()
 
 # ---------------------------------------------------------------------
 # Helpers
