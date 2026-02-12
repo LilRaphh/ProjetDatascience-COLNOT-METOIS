@@ -12,6 +12,14 @@ from app.config import (
     DATETIME_FORMAT, REGULARITY_PCT_THRESHOLD
 )
 
+from pathlib import Path
+from app.config import settings  # si tu as un Settings Pydantic
+
+def resolve_csv_path(year: int) -> Path:
+    filename = settings.file_pattern.format(pair=settings.pair, timeframe=settings.timeframe, year=year)
+    return Path(settings.data_dir) / filename
+
+
 class M1ImportService:
     @staticmethod
     def make_dataset_id(prefix: str) -> str:
