@@ -23,3 +23,5 @@ env/
 # Data
 data/
 models/
+notebooks/artifacts/
+
