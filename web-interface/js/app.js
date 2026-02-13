@@ -433,7 +433,149 @@ function renderEvalTable(ranking) {
 `;
 }
 
+// ── FULL PIPELINE AUTOMATION ──────────────────────────────────────────────────
+async function runFullPipeline() {
+    setLoading('btnFullPipe', true);
+    const out = document.getElementById('out-pipeline');
+    out.innerHTML = '<div style="margin-bottom:10px;">🚀 Démarrage du Pipeline Complet...</div>';
+
+    function logPipeline(msg, type = 'info') {
+        const color = type === 'error' ? '#ff4757' : (type === 'success' ? '#2ed573' : '#a4b0be');
+        const icon = type === 'error' ? '❌' : (type === 'success' ? '✅' : 'ℹ️');
+        out.innerHTML += `<div style="color:${color}; margin-bottom:4px; font-family:'IBM Plex Mono',monospace; font-size:11px;">
+            ${icon} <span style="opacity:0.8;">${new Date().toLocaleTimeString()}</span> ${msg}
+        </div>`;
+        out.scrollTop = out.scrollHeight;
+    }
+
+    try {
+        const trainYear = document.getElementById('pipeTrainYear').value;
+        const valYear = document.getElementById('pipeValYear').value;
+        const testYear = document.getElementById('pipeTestYear').value;
+        const testSuppYear = document.getElementById('pipeTestSuppYear').value; // Optionnel
+
+        if (!trainYear || !valYear || !testYear) throw new Error("Années Train, Val et Test requises.");
+
+        // 1. PROCESS DATASETS (Import -> M15 -> Clean -> Features)
+        logPipeline(`Traitement des données pour: ${trainYear}, ${valYear}, ${testYear}...`);
+
+        async function processYear(year) {
+            logPipeline(`[${year}] Import M1...`);
+            await callAPI('POST', '/dataset/load_m1', { year });
+
+            logPipeline(`[${year}] Agrégation M15...`);
+            // ID pattern convention: m1_{year}_{uuid}
+            // On doit récupérer l'ID fraîchement créé. 
+            // Pour simplifier, on ré-liste les datasets et on prend le plus récent correspondant à l'année M1
+            const listM1 = await callAPI('GET', '/dataset/list');
+            const datasetM1 = listM1.result.datasets.find(d => d.dataset_id.startsWith(`m1_${year}`) && d.phase === 'm1_raw');
+            if (!datasetM1) throw new Error(`Dataset M1 pour ${year} introuvable après import.`);
+
+            const agg = await callAPI('POST', '/m15/aggregate', { dataset_id: datasetM1.dataset_id });
+            const idM15 = agg.dataset_id;
+
+            logPipeline(`[${year}] Nettoyage M15...`);
+            const clean = await callAPI('POST', '/m15/clean', { dataset_id: idM15, gap_return_threshold: 0.001, drop_gaps: true });
+            const idClean = clean.dataset_id;
+
+            logPipeline(`[${year}] Calcul Features...`);
+            const feat = await callAPI('POST', '/features/compute', { dataset_id: idClean, drop_na: true, add_target: true });
+            logPipeline(`[${year}] ✅ Prêt (ID: ${feat.dataset_id})`, 'success');
+            return feat.dataset_id;
+        }
+
+        const idTrain = await processYear(trainYear);
+        const idVal = await processYear(valYear);
+        const idTest = await processYear(testYear);
+        let idTestSupp = null;
+        if (testSuppYear) {
+            try { idTestSupp = await processYear(testSuppYear); } catch (e) { logPipeline(`Skip TestSupp: ${e.message}`); }
+        }
+
+        refreshDatasets();
+
+        // 2. ML TRAINING
+        logPipeline("🤖 Entraînement Modèle ML (RandomForest)...");
+        const mlParams = { dataset_train_id: idTrain, dataset_val_id: idVal, model_type: 'rf' };
+        if (idTest) mlParams.dataset_test_id = idTest;
+        const ml = await callAPI('POST', '/trading_ml/train', mlParams);
+        logPipeline(`ML Terminé. Sharpe Val: ${ml.metrics.val.sharpe}`, 'success');
+
+        // 3. RL TRAINING
+        logPipeline("🎮 Entraînement Agent RL (10 épisodes)...");
+        let rlModelId = null;
+
+        await new Promise(async (resolve, reject) => {
+            try {
+                const response = await fetch(`${API}/rl/train`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        dataset_train_id: idTrain,
+                        dataset_val_id: idVal,
+                        dataset_test_id: idTest,
+                        n_episodes: 10,
+                        seed: 42
+                    })
+                });
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.replace('data: ', ''));
+                                if (event.type === 'result') {
+                                    rlModelId = event.payload.model_id;
+                                    logPipeline(`RL Modèle ID: ${rlModelId}`, 'success');
+                                } else if (event.type === 'error') {
+                                    throw new Error(event.message);
+                                }
+                            } catch (e) {
+                                if (e.message !== "Unexpected end of JSON input") console.warn("SSE Parse Warning", e);
+                            }
+                        }
+                    }
+                }
+                logPipeline("RL Terminé.", 'success');
+                resolve();
+            } catch (e) { reject(e); }
+        });
+
+        // 4. EVALUATION
+        logPipeline("🏆 Évaluation Finale...");
+        const evalParams = {};
+        if (ml && ml.model_id) evalParams.ml_model_id = ml.model_id;
+        if (rlModelId) evalParams.rl_model_id = rlModelId;
+
+        const evalData = await callAPI('GET', `/evaluate/compare/${idTest}`, evalParams);
+        logPipeline("Pipeline terminé avec succès !", 'success');
+
+        // Afficher les résultats dans le panel Eval
+        renderEvalTable(evalData.ranking_by_sharpe);
+        renderEvalChart(evalData.strategies);
+        showPanel('evaluate');
+
+    } catch (e) {
+        logPipeline(`Erreur: ${e.message}`, 'error');
+        console.error(e);
+        showToast(e.message, 'error');
+    } finally {
+        setLoading('btnFullPipe', false);
+    }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 checkHealth();
 setInterval(checkHealth, 30000);
-showPanel('import');
+// showPanel('active'); // Default to import or pipeline? Let's stay on import or whatever user clicks.
+

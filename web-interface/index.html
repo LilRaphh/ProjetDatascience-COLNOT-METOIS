@@ -102,6 +102,47 @@
       </div>
     </div>
 
+    <!-- FULL PIPELINE PANEL -->
+    <div class="panel-section" id="panel-pipeline" style="display:block; margin-bottom: 20px;">
+      <div class="panel" style="border-color: var(--accent);">
+        <div class="panel-header" style="background: rgba(0, 212, 255, 0.05);">
+          <div class="panel-title">🚀 Pipeline Automatique</div>
+          <span style="font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;">MASTER CONTROL</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="form-group">
+              <label>Année Train</label>
+              <input type="number" id="pipeTrainYear" value="2022">
+            </div>
+            <div class="form-group">
+              <label>Année Validation</label>
+              <input type="number" id="pipeValYear" value="2023">
+            </div>
+            <div class="form-group">
+              <label>Année Test</label>
+              <input type="number" id="pipeTestYear" value="2024">
+            </div>
+            <div class="form-group">
+              <label>Année Test Supp</label>
+              <input type="number" id="pipeTestSuppYear" value="2025" placeholder="Optionnel">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="runFullPipeline()" id="btnFullPipe"
+            style="width:100%; margin-top:10px;">
+            <span class="btn-text">Lancer le Pipeline Complet (Import → Features → ML → RL → Eval)</span>
+            <span class="loader"></span>
+          </button>
+          <div class="separator"></div>
+          <div class="output-area" id="out-pipeline" style="min-height: 100px;">
+            <span class="output-placeholder">// Le journal du pipeline apparaîtra ici...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATASET TRACKER -->
+
     <!-- ACTIVE DATASET TRACKER -->
     <div class="panel" style="margin-bottom: 24px;">
       <div class="panel-header">
