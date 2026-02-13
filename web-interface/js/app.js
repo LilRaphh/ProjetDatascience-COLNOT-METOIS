@@ -280,20 +280,81 @@ async function trainML() {
 // ── PHASE 8: RL ───────────────────────────────────────────────────────────────
 async function trainRL() {
     setLoading('btnRL', true);
+    const out = document.getElementById('out-rl');
+    out.textContent = '🚀 Démarrage de l\'entraînement...\n';
+
+    // Reset chart data
+    const episodesData = [];
+    const rewardsData = [];
+    const equitiesData = [];
+    document.getElementById('rlChartContainer').style.display = 'block';
+
     try {
         const trainId = document.getElementById('rlTrainId').value.trim();
         const valId = document.getElementById('rlValId').value.trim();
         const episodes = parseInt(document.getElementById('rlEpisodes').value);
         const seed = parseInt(document.getElementById('rlSeed').value);
+
         if (!trainId || !valId) throw new Error('Train et Val Dataset IDs requis.');
-        const data = await callAPI('POST', '/rl/train', {
-            dataset_train_id: trainId, dataset_val_id: valId,
-            n_episodes: episodes, seed
+
+        const response = await fetch(`${API}/rl/train`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                dataset_train_id: trainId,
+                dataset_val_id: valId,
+                n_episodes: episodes,
+                seed
+            })
         });
-        setOutput('out-rl', data);
-        showToast(`Agent Q-Learning entraîné — ${data.agent_info?.n_states_visited} états visités`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // Garder le reste incomplete
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const jsonStr = line.replace('data: ', '');
+                    try {
+                        const event = JSON.parse(jsonStr);
+
+                        if (event.type === 'progress') {
+                            const pct = Math.round((event.episode / event.total_episodes) * 100);
+
+                            // Update Chart Data
+                            episodesData.push(event.episode);
+                            rewardsData.push(event.reward);
+                            equitiesData.push(event.equity);
+                            renderRLTrainingChart(episodesData, rewardsData, equitiesData);
+
+                            out.innerHTML = `⏳ Épisode ${event.episode}/${event.total_episodes} (${pct}%)\n` +
+                                `Reward: <span class="num">${event.reward}</span> | ` +
+                                `Equity: <span class="num">${event.equity}</span> | ` +
+                                `Epsilon: <span class="num">${event.epsilon}</span>`;
+                        } else if (event.type === 'result') {
+                            const data = event.payload;
+                            out.innerHTML += `\n\n✅ <span class="key">Entraînement terminé !</span>\n` +
+                                renderJSON(data);
+                            showToast(`Agent Q-Learning entraîné — ${data.agent_info?.n_states_visited} états visités`);
+                        } else if (event.type === 'error') {
+                            throw new Error(event.message);
+                        }
+                    } catch (e) {
+                        console.error('SSE Parse Error', e);
+                    }
+                }
+            }
+        }
     } catch (e) {
-        document.getElementById('out-rl').textContent = '❌ ' + e.message;
+        out.textContent += '\n\n❌ Erreur: ' + e.message;
         showToast(e.message, 'error');
     } finally {
         setLoading('btnRL', false);

@@ -58,12 +58,19 @@ def train_rl(request: RLTrainParams):
         df_val = dataset_store.get(dataset_val_id).df
         df_test = dataset_store.get(dataset_test_id).df if dataset_test_id else None
 
-        result = rl_service.train(
-            df_train, df_val, df_test,
-            n_episodes=n_episodes,
-            seed=seed,
-        )
-        return result
+        def event_generator():
+            import json
+            gen = rl_service.train_gen(
+                df_train, df_val, df_test,
+                n_episodes=n_episodes,
+                seed=seed,
+            )
+            for event in gen:
+                # SSE format: "data: <json>\n\n"
+                yield f"data: {json.dumps(event)}\n\n"
+
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     except HTTPException:
         raise
