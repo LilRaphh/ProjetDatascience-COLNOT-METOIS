@@ -183,22 +183,104 @@ class TradingMLService:
         "gbm": "v3",
     }
 
+    # ── OPTIMIZATION & INTERPRETABILITY ──────────────────────────────────────
+
+    def _optimize_model(self, X_train: np.ndarray, y_train: np.ndarray, model_type: str) -> Any:
+        """Optimise les hyperparamètres avec Grid Search et TimeSeriesSplit (respect temporalité)."""
+        from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+
+        # TimeSeriesSplit pour ne pas mélanger le futur et le passé
+        # 3 splits : train augmente progressivement, val est le segment suivant
+        tscv = TimeSeriesSplit(n_splits=3)
+
+        if model_type == "rf":
+            param_grid = {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [4, 8, 12],
+                "min_samples_leaf": [20, 50, 100],
+                "class_weight": ["balanced", "balanced_subsample"],
+            }
+            base_model = RandomForestClassifier(random_state=42, n_jobs=-1)
+        elif model_type == "gbm":
+            param_grid = {
+                "n_estimators": [100, 200],
+                "learning_rate": [0.01, 0.05, 0.1],
+                "max_depth": [3, 4, 5],
+                "subsample": [0.8, 1.0],
+            }
+            base_model = GradientBoostingClassifier(random_state=42)
+        else:
+            return self._build_model(model_type)  # Pas d'opti pour logreg ou autres
+
+        print(f"🔍 Grid Search ({model_type}) sur {len(X_train)} samples...")
+        grid = GridSearchCV(base_model, param_grid, cv=tscv, scoring="f1", n_jobs=-1, verbose=1)
+        grid.fit(X_train, y_train)
+        
+        print(f"✅ Best params: {grid.best_params_} (Score: {grid.best_score_:.4f})")
+        return grid.best_estimator_
+
+    def _explain_decision(self, model: any, X_sample: pd.DataFrame, signal: str) -> str:
+        """Génère une explication en langage naturel pour une prédiction donnée."""
+        if signal == "HOLD":
+            return "No strong signal detected based on current market conditions."
+
+        explanation = []
+        
+        # Récupérer les feature importances si dispo
+        importances = {}
+        if hasattr(model, "feature_importances_"):
+            importances = dict(zip(self.FEATURE_COLS, model.feature_importances_))
+        
+        # Analyser les features clés (top influence)
+        # On regarde juste les valeurs brutes pour créer une narration simple
+        
+        # 1. Tendance (EMA)
+        ema_diff = X_sample.get("ema_diff", 0)
+        dist_ema200 = X_sample.get("distance_to_ema200", 0)
+        
+        if signal == "BUY":
+            if dist_ema200 > 0:
+                explanation.append("price is above the long-term trend (EMA200)")
+            if ema_diff > 0:
+                explanation.append("short-term momentum is positive")
+        elif signal == "SELL":
+            if dist_ema200 < 0:
+                explanation.append("price is below the long-term trend (EMA200)")
+            if ema_diff < 0:
+                explanation.append("short-term momentum is negative")
+
+        # 2. RSI (V2 feature)
+        rsi = X_sample.get("rsi_14", 50)
+        if rsi < 30 and signal == "BUY":
+            explanation.append("market is potentially oversold (RSI < 30)")
+        elif rsi > 70 and signal == "SELL":
+            explanation.append("market is potentially overbought (RSI > 70)")
+
+        # 3. Volatilité
+        vol = X_sample.get("volatility_ratio", 1.0)
+        if vol > 1.5:
+            explanation.append("volatility is expanding")
+        elif vol < 0.8:
+            explanation.append("market is consolidating")
+
+        if not explanation:
+            return f"Model detects complex pattern favoring {signal}."
+            
+        return f"Model suggests {signal} because " + ", ".join(explanation) + "."
+
+    # ── MODIFIED TRAIN ───────────────────────────────────────────────────────
+
     def train(
         self,
         df_train: pd.DataFrame,
         df_val: pd.DataFrame,
         df_test: Optional[pd.DataFrame],
         model_type: str = "rf",
+        optimize: bool = False,
     ) -> Dict[str, Any]:
         """
         Entraîne un modèle avec split temporel strict.
-
-        Parameters
-        ----------
-        df_train : données 2022 (avec features + target)
-        df_val   : données 2023 (validation)
-        df_test  : données 2024 (test final – utilisé uniquement en évaluation)
-        model_type : logreg | rf | gbm
+        Optionnel: optimize=True pour Grid Search.
         """
         if model_type not in self.VERSION_MAP:
             raise ValueError(f"model_type inconnu: {model_type}. Choix: {list(self.VERSION_MAP)}")
@@ -212,8 +294,6 @@ class TradingMLService:
 
         if len(X_train) == 0:
             raise ValueError("Dataset train vide après sélection des features.")
-        if len(X_val) == 0:
-            raise ValueError("Dataset val vide après sélection des features.")
 
         # ── Scaling ───────────────────────────────────────────────────────────
         scaler = StandardScaler()
@@ -221,11 +301,20 @@ class TradingMLService:
         X_val_s = scaler.transform(X_val)
         X_test_s = scaler.transform(X_test) if X_test is not None else None
 
-        # ── Modèle ────────────────────────────────────────────────────────────
-        model = self._build_model(model_type)
-        model.fit(X_train_s, y_train)
+        # ── Modèle (Optimisation ou Défaut) ───────────────────────────────────
+        if optimize:
+            # On combine Train + Val pour le Grid Search car TimeSeriesSplit va créer les folds
+            # Mais attention, pour respecter la logique stricte "Train 2022", "Val 2023",
+            # l'optimisation doit se faire SUR 2022 UNIQUEMENT (avec CV interne), 
+            # OU sur 2022+2023 avec CV qui respecte le temps.
+            # Ici on optimise sur le train set (2022) pour trouver les hyperparamètres,
+            # puis on valide une dernière fois sur 2023.
+            model = self._optimize_model(X_train_s, y_train, model_type)
+        else:
+            model = self._build_model(model_type)
+            model.fit(X_train_s, y_train)
 
-        # ── Prédictions ───────────────────────────────────────────────────────
+        # ── Le reste est identique (Prédictions, Métriques...) ────────────────
         def _predict(X_s, model):
             y_pred = model.predict(X_s)
             try:
@@ -237,7 +326,6 @@ class TradingMLService:
         y_train_pred, y_train_proba = _predict(X_train_s, model)
         y_val_pred, y_val_proba = _predict(X_val_s, model)
 
-        # ── Métriques ─────────────────────────────────────────────────────────
         metrics = {
             "train": {
                 **_stat_metrics(y_train, y_train_pred, y_train_proba),
@@ -263,86 +351,58 @@ class TradingMLService:
                 feat: round(float(imp), 6)
                 for feat, imp in zip(self.FEATURE_COLS, model.feature_importances_)
             }
-        elif hasattr(model, "coef_"):
-            feature_importance = {
-                feat: round(float(coef), 6)
-                for feat, coef in zip(self.FEATURE_COLS, model.coef_[0])
-            }
 
         # ── Construire model_data ─────────────────────────────────────────────
         model_id = f"trading_{model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         model_data = {
             "model_id": model_id,
             "model_type": model_type,
-            "version": self.VERSION_MAP[model_type],
+            "version": self.VERSION_MAP[model_type] + ("_optimized" if optimize else ""),
             "created_at": datetime.now().isoformat(),
             "features": self.FEATURE_COLS,
-            "n_features": len(self.FEATURE_COLS),
-            "n_train": int(len(X_train)),
-            "n_val": int(len(X_val)),
-            "n_test": int(len(X_test)) if X_test is not None else 0,
             "hyperparams": model.get_params(),
             "metrics": metrics,
             "feature_importance": feature_importance,
-            # Objets sklearn (non sérialisables JSON → stockés en mémoire)
             "_model_object": model,
             "_scaler": scaler,
         }
 
         _register_model(model_data)
-
-        # Retourner une version sérialisable
         return self._serializable(model_data)
 
-    def predict(
-        self,
-        model_id: str,
-        df: pd.DataFrame,
-    ) -> Dict[str, Any]:
-        """
-        Prédit les signaux sur un DataFrame M15 avec features déjà calculées.
-        """
+    def predict_latest(self, model_id: str, df: pd.DataFrame) -> Dict[str, Any]:
+        """Prédit le signal pour la DERNIÈRE bougie disponible + EXPLICATION."""
         model_data = get_model(model_id)
         model = model_data["_model_object"]
         scaler = model_data["_scaler"]
 
-        X = df[self.FEATURE_COLS].copy()
-        X = X.dropna()
-        if len(X) == 0:
-            raise ValueError("Aucune ligne valide après sélection des features.")
+        # Prendre la dernière ligne avec features
+        X = df[self.FEATURE_COLS].copy() # Pas de dropna, on veut la dernière
+        if X.empty: raise ValueError("DataFrame vide.")
+        
+        last_row = X.iloc[[-1]] # Garder DataFrame
+        if last_row.isna().any().any():
+            raise ValueError("Features manquantes pour la dernière bougie (calcul features incomplet).")
 
-        X_s = scaler.transform(X)
-        y_pred = model.predict(X_s)
-
+        X_s = scaler.transform(last_row)
+        y_pred = model.predict(X_s)[0]
         try:
-            y_proba = model.predict_proba(X_s)[:, 1].tolist()
-        except Exception:
+            y_proba = model.predict_proba(X_s)[0, 1]
+        except:
             y_proba = None
-
-        signals = ["BUY" if p == 1 else "SELL" for p in y_pred]
+            
+        signal = "BUY" if y_pred == 1 else "SELL"
+        
+        # Générer explication
+        # On doit passer une Series ou Dict avec les noms de colonnes pour l'analyse
+        explanation = self._explain_decision(model, last_row.iloc[0], signal)
 
         return {
             "model_id": model_id,
-            "n_predictions": int(len(y_pred)),
-            "signals": signals,
-            "predictions_binary": y_pred.tolist(),
-            "probabilities": y_proba,
-        }
-
-    def predict_latest(self, model_id: str, df: pd.DataFrame) -> Dict[str, Any]:
-        """Prédit le signal pour la DERNIÈRE bougie disponible."""
-        result = self.predict(model_id, df)
-        last_signal = result["signals"][-1] if result["signals"] else "HOLD"
-        last_proba = (
-            result["probabilities"][-1]
-            if result["probabilities"] is not None
-            else None
-        )
-        return {
-            "model_id": model_id,
-            "signal": last_signal,
-            "probability_buy": last_proba,
-            "model_version": get_model(model_id)["version"],
+            "signal": signal,
+            "probability_buy": y_proba,
+            "explanation": explanation,
+            "model_version": model_data["version"],
         }
 
     # ── helpers ───────────────────────────────────────────────────────────────
@@ -384,3 +444,4 @@ class TradingMLService:
     def _serializable(model_data: Dict[str, Any]) -> Dict[str, Any]:
         """Retourne une copie sans les objets sklearn."""
         return {k: v for k, v in model_data.items() if not k.startswith("_")}
+

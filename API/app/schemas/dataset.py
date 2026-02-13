@@ -49,6 +49,7 @@ class MLTrainParams(BaseModel):
     dataset_val_id: str = Field(..., description="Dataset 2023 avec features")
     dataset_test_id: Optional[str] = Field(None, description="Dataset 2024 (optionnel, jamais utilisé pour entraîner)")
     model_type: str = Field("rf", description="logreg | rf | gbm")
+    optimize: bool = Field(False, description="Activer Grid Search (plus lent)")
 
 
 # Schémas pour RL

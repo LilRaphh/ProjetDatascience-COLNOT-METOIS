@@ -46,6 +46,7 @@ def train_model(request: MLTrainParams):
         dataset_val_id = request.dataset_val_id
         dataset_test_id = request.dataset_test_id
         model_type = request.model_type
+        optimize = request.optimize
         
         for did in [dataset_train_id, dataset_val_id]:
             if not dataset_store.exists(did):
@@ -58,7 +59,7 @@ def train_model(request: MLTrainParams):
         df_val = dataset_store.get(dataset_val_id).df
         df_test = dataset_store.get(dataset_test_id).df if dataset_test_id else None
 
-        result = ml_service.train(df_train, df_val, df_test, model_type=model_type)
+        result = ml_service.train(df_train, df_val, df_test, model_type=model_type, optimize=optimize)
         return result
 
     except HTTPException:

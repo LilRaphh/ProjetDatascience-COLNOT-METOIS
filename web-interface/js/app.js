@@ -495,8 +495,15 @@ async function runFullPipeline() {
         refreshDatasets();
 
         // 2. ML TRAINING
-        logPipeline("🤖 Entraînement Modèle ML (RandomForest)...");
-        const mlParams = { dataset_train_id: idTrain, dataset_val_id: idVal, model_type: 'rf' };
+        const doOptimize = document.getElementById('pipeOptimize').checked;
+        logPipeline(`🤖 Entraînement Modèle ML (RandomForest)${doOptimize ? ' + GridSearch 🐢' : ''}...`);
+
+        const mlParams = {
+            dataset_train_id: idTrain,
+            dataset_val_id: idVal,
+            model_type: 'rf',
+            optimize: doOptimize
+        };
         if (idTest) mlParams.dataset_test_id = idTest;
         const ml = await callAPI('POST', '/trading_ml/train', mlParams);
         logPipeline(`ML Terminé. Sharpe Val: ${ml.metrics.val.sharpe}`, 'success');
