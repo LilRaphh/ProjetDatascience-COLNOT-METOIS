@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GBP/USD Trading System</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+
+    :root {
+      --bg: #0a0e14;
+      --surface: #0f1520;
+      --surface2: #141c2d;
+      --border: #1e2d47;
+      --accent: #00d4ff;
+      --accent2: #00ff88;
+      --accent3: #ff6b35;
+      --warn: #ffcc00;
+      --text: #c8d8f0;
+      --text-dim: #5a7399;
+      --green: #00ff88;
+      --red: #ff4757;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(180deg, rgba(0, 212, 255, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .logo span {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    /* HERO */
+    .hero {
+      padding: 60px 0 40px;
+      text-align: center;
+    }
+
+    .hero-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    .hero h2 {
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .hero h2 span {
+      color: var(--accent);
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    /* PIPELINE */
+    .pipeline-section {
+      padding: 40px 0;
+    }
+
+    .section-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .pipeline-step {
+      background: var(--surface);
+      padding: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .pipeline-step:hover {
+      background: var(--surface2);
+    }
+
+    .pipeline-step.active {
+      background: var(--surface2);
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .step-num {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .step-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .step-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    .step-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 9px;
+      font-family: 'IBM Plex Mono', monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 212, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+    }
+
+    /* PANEL */
+    .panel-section {
+      padding: 32px 0;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 16px 24px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-body {
+      padding: 24px;
+    }
+
+    /* FORM */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    select,
+    input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus,
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      padding: 11px 24px;
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      letter-spacing: 0.03em;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      background: #33ddff;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* OUTPUT */
+    .output-area {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      min-height: 120px;
+      max-height: 400px;
+      overflow-y: auto;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .output-area .key {
+      color: var(--accent);
+    }
+
+    .output-area .val {
+      color: var(--accent2);
+    }
+
+    .output-area .num {
+      color: #ff9966;
+    }
+
+    .output-area .str {
+      color: #a8c4ff;
+    }
+
+    .output-area .bool {
+      color: var(--warn);
+    }
+
+    .output-placeholder {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* METRICS GRID */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .metric-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* LOADING */
+    .loader {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading .loader {
+      display: inline-block;
+    }
+
+    .loading .btn-text {
+      display: none;
+    }
+
+    /* NOTIFICATION */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-size: 13px;
+      max-width: 360px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: rgba(0, 255, 136, 0.4);
+    }
+
+    .toast.error {
+      border-color: rgba(255, 71, 87, 0.4);
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      padding: 8px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab.active {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: rgba(0, 212, 255, 0.4);
+      color: var(--accent);
+    }
+
+    .tab:hover:not(.active) {
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    /* COMPARISON TABLE */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .compare-table th {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .compare-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(30, 45, 71, 0.5);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+    }
+
+    .compare-table tr:hover td {
+      background: rgba(0, 212, 255, 0.03);
+    }
+
+    .compare-table .rank-1 td {
+      color: var(--accent2);
+    }
+
+    .compare-table .positive {
+      color: var(--green);
+    }
+
+    .compare-table .negative {
+      color: var(--red);
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0;
+      margin-top: 60px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero h2 {
+        font-size: 28px;
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* DATASET BADGE */
+    .ds-badge {
+      display: inline-block;
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+    }
+
+    .separator {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .info-row .icon {
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <div class="logo">
+          <div class="logo-icon">📈</div>
+          <div>
+            <h1>GBP/USD Trading System</h1>
+            <span>COLNOT & MÉTOIS — Février 2026</span>
+          </div>
+        </div>
+        <div class="status-badge" id="healthBadge">
+          <div class="status-dot"></div>
+          <span id="healthStatus">Connexion API...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="container">
+    <div class="hero">
+      <div class="hero-label">Projet Fil Rouge — M1 → M15 → ML → RL → API</div>
+      <h2>Système de Décision<br><span>Algorithmique</span></h2>
+      <p>Pipeline complet de trading GBP/USD : import M1, agrégation M15, feature engineering, analyse exploratoire, ML
+        et Reinforcement Learning.</p>
+    </div>
+
+    <!-- PIPELINE VISUAL -->
+    <div class="pipeline-section">
+      <div class="section-title">// Pipeline de décision</div>
+      <div class="pipeline">
+        <div class="pipeline-step" onclick="showPanel('import')">
+          <div class="step-num">01</div>
+          <div class="step-icon">📥</div>
+          <div class="step-name">Import M1</div>
+          <div class="step-desc">Chargement CSV brut + timestamp + régularité 1min</div>
+          <span class="step-badge">T01</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('m15')">
+          <div class="step-num">02–03</div>
+          <div class="step-icon">⚙️</div>
+          <div class="step-name">M15</div>
+          <div class="step-desc">Agrégation OHLC + nettoyage (gaps, prix négatifs)</div>
+          <span class="step-badge">T02–03</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('features')">
+          <div class="step-num">04</div>
+          <div class="step-icon">🔧</div>
+          <div class="step-name">Features V2</div>
+          <div class="step-desc">20 features court terme + contexte & régime</div>
+          <span class="step-badge">T05</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('eda')">
+          <div class="step-num">05</div>
+          <div class="step-icon">🔬</div>
+          <div class="step-name">EDA</div>
+          <div class="step-desc">ADF, ACF, distribution, volatilité, analyse horaire</div>
+          <span class="step-badge">T04</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('baseline')">
+          <div class="step-num">06</div>
+          <div class="step-icon">📏</div>
+          <div class="step-name">Baseline</div>
+          <div class="step-desc">Random, Buy & Hold, Règles fixes EMA+RSI</div>
+          <span class="step-badge">T06</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('ml')">
+          <div class="step-num">07</div>
+          <div class="step-icon">🤖</div>
+          <div class="step-name">ML Trading</div>
+          <div class="step-desc">LogReg / RF / GBM — split 2022/2023/2024</div>
+          <span class="step-badge">T07</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('rl')">
+          <div class="step-num">08</div>
+          <div class="step-icon">🎮</div>
+          <div class="step-name">RL</div>
+          <div class="step-desc">Q-Learning — state, action, reward, walk-forward</div>
+          <span class="step-badge">T08</span>
+        </div>
+        <div class="pipeline-step" onclick="showPanel('evaluate')">
+          <div class="step-num">09</div>
+          <div class="step-icon">🏆</div>
+          <div class="step-name">Évaluation</div>
+          <div class="step-desc">Comparaison toutes stratégies + stress tests 2024</div>
+          <span class="step-badge">T09</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVE DATASET TRACKER -->
+    <div class="panel" style="margin-bottom: 24px;">
+      <div class="panel-header">
+        <div class="panel-title">📋 Datasets en mémoire</div>
+        <button class="btn btn-secondary" style="font-size:11px;padding:6px 14px;"
+          onclick="refreshDatasets()">Rafraîchir</button>
+      </div>
+      <div class="panel-body">
+        <div class="form-grid" id="datasetTracker">
+          <div style="color:var(--text-dim);font-size:12px;">Chargez un dataset pour commencer.</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'IBM Plex Mono',monospace;">
+          Copiez le dataset_id pour l'utiliser dans les autres panneaux.
+        </div>
+      </div>
+    </div>
+
+    <!-- PANELS -->
+    <div id="panel-import" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📥 Phase 1 — Import M1</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">POST
+            /dataset/load_m1</span>
+        </div>
+        <div class="panel-body">
+          <div class="info-row"><span class="icon">ℹ️</span> Charge le CSV M1 brut (2022, 2023 ou 2024) depuis le
+            dossier <code>data/</code>, fusionne Date+Time → timestamp, vérifie la régularité 1min.</div>
+          <div class="separator"></div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Année</label>
+              <select id="importYear">
+                <option value="2022">2022 — Entraînement</option>
+                <option value="2023">2023 — Validation</option>
+                <option value="2024">2024 — Test final</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="importM1()" id="btnImport">
+              <span class="btn-text">Charger M1</span>
+              <span class="loader"></span>
+            </button>
+          </div>
+          <div class="separator"></div>
+          <div class="output-area" id="out-import"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-m15" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">⚙️ Phase 2–3 — Agrégation & Nettoyage M15</div>
+        </div>
+        <div class="panel-body">
+          <div class="tabs">
+            <div class="tab active" onclick="setTab(this,'agg')">Agrégation M1→M15</div>
+            <div class="tab" onclick="setTab(this,'clean15')">Nettoyage M15</div>
+          </div>
+          <div id="tab-agg">
+            <div class="info-row"><span class="icon">ℹ️</span> Agrège les bougies M1 → M15 (open=first, high=max,
+              low=min, close=last). Supprime les bougies incomplètes (&lt;15 points M1).</div>
+            <div class="form-grid" style="margin-top:16px;">
+              <div class="form-group">
+                <label>Dataset ID (M1)</label>
+                <input type="text" id="aggDatasetId" placeholder="ex: m1_2022_abc123">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="aggregateM15()" id="btnAgg">
+              <span class="btn-text">Agréger M1 → M15</span>
+              <span class="loader"></span>
+            </button>
+            <div class="separator"></div>
+            <div class="output-area" id="out-agg"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+            </div>
+          </div>
+          <div id="tab-clean15" style="display:none;">
+            <div class="info-row"><span class="icon">ℹ️</span> Supprime bougies incomplètes, prix négatifs, incohérences
+              OHLC, gaps anormaux (&gt;2%).</div>
+            <div class="form-grid" style="margin-top:16px;">
+              <div class="form-group">
+                <label>Dataset ID (M15)</label>
+                <input type="text" id="clean15DatasetId" placeholder="ex: m1_2022_abc123_m15">
+              </div>
+              <div class="form-group">
+                <label>Seuil de gap (%)</label>
+                <input type="number" id="gapThreshold" value="0.02" step="0.005" min="0.005" max="0.1">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="cleanM15()" id="btnClean15">
+              <span class="btn-text">Nettoyer M15</span>
+              <span class="loader"></span>
+            </button>
+            <div class="separator"></div>
+            <div class="output-area" id="out-clean15"><span class="output-placeholder">// Résultat apparaîtra
+                ici…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-features" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🔧 Phase 4 — Feature Engineering V2</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">POST
+            /features/compute</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Dataset ID (M15 nettoyé)</label>
+              <input type="text" id="featDatasetId" placeholder="ex: m1_2022_abc_m15_clean">
+            </div>
+            <div class="form-group">
+              <label>Ajouter target (y)</label>
+              <select id="addTarget">
+                <option value="true">Oui — y=1 si close_t+1 > close_t</option>
+                <option value="false">Non</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="computeFeatures()" id="btnFeat">
+            <span class="btn-text">Calculer les features</span>
+            <span class="loader"></span>
+          </button>
+          <div class="separator"></div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;margin-bottom:8px;">
+              Features V2 disponibles :</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;" id="featureTagsDisplay">
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">return_1</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">return_4</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">ema_20</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">ema_50</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">ema_diff</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">rsi_14</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">rolling_std_20</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">atr_14</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">adx_14</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">macd</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">ema_200</span>
+              <span
+                style="font-size:10px;padding:3px 8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">+9
+                autres</span>
+            </div>
+          </div>
+          <div class="output-area" id="out-features"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-eda" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🔬 Phase 5 — Analyse Exploratoire (EDA)</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">GET
+            /eda/full_report/{id}</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Dataset ID (M15)</label>
+              <input type="text" id="edaDatasetId" placeholder="ex: m1_2022_abc_m15_clean">
+            </div>
+            <div class="form-group">
+              <label>Type d'analyse</label>
+              <select id="edaType">
+                <option value="full_report">Rapport complet</option>
+                <option value="returns">Distribution des rendements</option>
+                <option value="volatility">Volatilité dans le temps</option>
+                <option value="hourly">Analyse horaire</option>
+                <option value="autocorrelation">Autocorrélation (ACF)</option>
+                <option value="adf">Test ADF (stationnarité)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="runEDA()" id="btnEDA">
+            <span class="btn-text">Lancer l'analyse</span>
+            <span class="loader"></span>
+          </button>
+          <div class="separator"></div>
+          <div class="output-area" id="out-eda"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-baseline" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📏 Phase 6 — Stratégies Baseline</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">GET
+            /baseline/compare/{id}</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Dataset ID (M15)</label>
+              <input type="text" id="baselineDatasetId" placeholder="ex: m1_2022_abc_m15_clean">
+            </div>
+            <div class="form-group">
+              <label>Seed (aléatoire)</label>
+              <input type="number" id="baselineSeed" value="42">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="runBaseline()" id="btnBaseline">
+            <span class="btn-text">Comparer les baselines</span>
+            <span class="loader"></span>
+          </button>
+          <div class="separator"></div>
+          <div id="baselineTable"></div>
+          <div class="output-area" id="out-baseline"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-ml" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🤖 Phase 7 — Machine Learning Trading</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">POST
+            /trading_ml/train</span>
+        </div>
+        <div class="panel-body">
+          <div class="info-row"><span class="icon">⚠️</span> Split temporel strict obligatoire : Train=2022 / Val=2023 /
+            Test=2024</div>
+          <div class="form-grid" style="margin-top:16px;">
+            <div class="form-group">
+              <label>Dataset Train (2022 + features)</label>
+              <input type="text" id="mlTrainId" placeholder="ex: m1_2022_abc_m15_clean_features">
+            </div>
+            <div class="form-group">
+              <label>Dataset Val (2023 + features)</label>
+              <input type="text" id="mlValId" placeholder="ex: m1_2023_abc_m15_clean_features">
+            </div>
+            <div class="form-group">
+              <label>Dataset Test (2024, optionnel)</label>
+              <input type="text" id="mlTestId" placeholder="ex: m1_2024_abc_m15_clean_features">
+            </div>
+            <div class="form-group">
+              <label>Modèle</label>
+              <select id="mlModelType">
+                <option value="rf">RandomForest (v2 — recommandé)</option>
+                <option value="logreg">LogisticRegression (v1)</option>
+                <option value="gbm">GradientBoosting (v3)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="trainML()" id="btnML">
+            <span class="btn-text">Entraîner le modèle</span>
+            <span class="loader"></span>
+          </button>
+          <div class="separator"></div>
+          <div class="output-area" id="out-ml"><span class="output-placeholder">// Résultat apparaîtra ici…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-rl" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🎮 Phase 8 — Reinforcement Learning</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">POST
+            /rl/train</span>
+        </div>
+        <div class="panel-body">
+          <div class="tabs">
+            <div class="tab active" onclick="setTab(this,'rl-train')">Entraînement</div>
+            <div class="tab" onclick="setTab(this,'rl-design')">Conception (9.1)</div>
+          </div>
+          <div id="tab-rl-train">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Dataset Train (2022 + features)</label>
+                <input type="text" id="rlTrainId" placeholder="ex: m1_2022_abc_m15_clean_features">
+              </div>
+              <div class="form-group">
+                <label>Dataset Val (2023 + features)</label>
+                <input type="text" id="rlValId" placeholder="ex: m1_2023_abc_m15_clean_features">
+              </div>
+              <div class="form-group">
+                <label>Nombre d'épisodes</label>
+                <input type="number" id="rlEpisodes" value="10" min="1" max="100">
+              </div>
+              <div class="form-group">
+                <label>Seed</label>
+                <input type="number" id="rlSeed" value="42">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="trainRL()" id="btnRL">
+              <span class="btn-text">Entraîner l'agent Q-Learning</span>
+              <span class="loader"></span>
+            </button>
+            <div class="separator"></div>
+            <div class="output-area" id="out-rl"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+            </div>
+          </div>
+          <div id="tab-rl-design" style="display:none;">
+            <button class="btn btn-secondary" onclick="getRLDesign()" style="margin-bottom:16px;" id="btnRLDesign">
+              <span class="btn-text">Afficher la conception (section 9.1)</span>
+              <span class="loader"></span>
+            </button>
+            <div class="output-area" id="out-rl-design"><span class="output-placeholder">// Conception obligatoire sur
+                papier…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-evaluate" class="panel-section" style="display:none;">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🏆 Phase 9 — Évaluation Finale</div>
+          <span style="font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">GET
+            /evaluate/compare/{id}</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Dataset Test 2024 (avec features)</label>
+              <input type="text" id="evalDatasetId" placeholder="ex: m1_2024_abc_m15_clean_features">
+            </div>
+            <div class="form-group">
+              <label>ML Model ID (optionnel)</label>
+              <input type="text" id="evalMLId" placeholder="Laisser vide pour meilleur modèle">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="runEvaluation()" id="btnEval">
+              <span class="btn-text">Comparer toutes les stratégies</span>
+              <span class="loader"></span>
+            </button>
+            <button class="btn btn-secondary" onclick="runStressTest()" id="btnStress">
+              Stress test trimestriel
+            </button>
+          </div>
+          <div class="separator"></div>
+          <div id="evalTable"></div>
+          <div class="output-area" id="out-eval"><span class="output-placeholder">// Résultat apparaîtra ici…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">✅</span>
+    <span id="toastMsg"></span>
+  </div>
+
+  <footer>
+    <div class="container">
+      GBP/USD Trading System v2.0 — COLNOT & MÉTOIS — Projet Data Science M1 — 2026
+    </div>
+  </footer>
+
+  <script>
+    const API = 'http://localhost:8000';
+
+    // ── Utilities ───────────────────────────────────────────────────────────────
+    async function callAPI(method, path, params = {}) {
+      let url = `${API}${path}`;
+      const opts = { method };
+
+      // Pour GET/DELETE : paramètres dans l'URL (query string)
+      if (method === 'GET' || method === 'DELETE') {
+        const qs = new URLSearchParams(params).toString();
+        if (qs) url += '?' + qs;
+      }
+      // Pour POST/PUT/PATCH : paramètres dans le body JSON
+      else {
+        opts.headers = { 'Content-Type': 'application/json' };
+        opts.body = JSON.stringify(params);
+      }
+
+      const res = await fetch(url, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+      return data;
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = type === 'success' ? '✅' : '❌';
+      t.className = `toast show ${type}`;
+      setTimeout(() => t.className = 'toast', 4000);
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.classList.toggle('loading', loading);
+      btn.disabled = loading;
+    }
+
+    function renderJSON(data) {
+      return JSON.stringify(data, null, 2)
+        .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+        .replace(/: "(.*?)"/g, ': <span class="str">"$1"</span>')
+        .replace(/: (-?\d+\.?\d*)/g, ': <span class="num">$1</span>')
+        .replace(/: (true|false)/g, ': <span class="bool">$1</span>');
+    }
+
+    function setOutput(id, data) {
+      document.getElementById(id).innerHTML = renderJSON(data);
+    }
+
+    function setTab(el, name) {
+      el.closest('.panel-body').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      const siblings = el.closest('.panel-body').querySelectorAll('[id^="tab-"]');
+      siblings.forEach(s => s.style.display = 'none');
+      const target = el.closest('.panel-body').querySelector('#tab-' + name);
+      if (target) target.style.display = 'block';
+    }
+
+    // ── Navigation ───────────────────────────────────────────────────────────────
+    function showPanel(name) {
+      document.querySelectorAll('.panel-section').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.pipeline-step').forEach(s => s.classList.remove('active'));
+      const panel = document.getElementById('panel-' + name);
+      if (panel) {
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const steps = {
+        'import': 0, 'm15': 1, 'features': 2, 'eda': 3,
+        'baseline': 4, 'ml': 5, 'rl': 6, 'evaluate': 7
+      };
+      const idx = steps[name];
+      if (idx !== undefined) {
+        document.querySelectorAll('.pipeline-step')[idx]?.classList.add('active');
+      }
+    }
+
+    // ── Health Check ──────────────────────────────────────────────────────────────
+    async function checkHealth() {
+      try {
+        const data = await callAPI('GET', '/health');
+        document.getElementById('healthStatus').textContent = 'API connectée';
+      } catch (e) {
+        document.getElementById('healthStatus').textContent = 'API hors ligne';
+        document.getElementById('healthBadge').style.background = 'rgba(255,71,87,0.1)';
+        document.getElementById('healthBadge').style.borderColor = 'rgba(255,71,87,0.3)';
+      }
+    }
+
+    // ── Dataset Tracker ───────────────────────────────────────────────────────────
+
+    // Style injecté pour les headers d'année
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .dataset-year-group { margin-bottom: 12px; }
+      .dataset-year-header { 
+        font-size: 11px; font-weight: 600; color: var(--text-dim); 
+        background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 4px;
+        margin-bottom: 6px; font-family: 'IBM Plex Mono', monospace;
+        display: flex; align-items: center; gap: 6px;
+      }
+      .dataset-year-header::before { content: '📂'; font-size: 10px; opacity: 0.7; }
+      .dataset-list { display: flex; flex-direction: column; gap: 6px; padding-left: 6px; border-left: 1px solid var(--border); margin-left: 6px; }
+    `;
+    document.head.appendChild(style);
+
+    function getPhaseScore(id) {
+      if (id.includes('trading_')) return 5;
+      if (id.includes('_features')) return 4;
+      if (id.includes('_clean')) return 3;
+      if (id.includes('_m15')) return 2;
+      if (id.startsWith('m1_')) return 1;
+      return 0;
+    }
+
+    function getYearFromId(id) {
+      const match = id.match(/_(\d{4})_/);
+      return match ? match[1] : 'Autres';
+    }
+
+    async function refreshDatasets() {
+      try {
+        const data = await callAPI('GET', '/dataset/list');
+        const datasets = data.result?.datasets || [];
+        const el = document.getElementById('datasetTracker');
+
+        if (datasets.length === 0) {
+          el.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">Aucun dataset en mémoire.</div>';
+          return;
+        }
+
+        // Grouper par année
+        const groups = {};
+        datasets.forEach(d => {
+          const year = getYearFromId(d.dataset_id);
+          if (!groups[year]) groups[year] = [];
+          groups[year].push(d);
+        });
+
+        // Trier les groupes (années) et les datasets (phase)
+        const sortedYears = Object.keys(groups).sort();
+
+        let html = '';
+        sortedYears.forEach(year => {
+          // Trier les datasets de l'année par phase
+          groups[year].sort((a, b) => getPhaseScore(a.dataset_id) - getPhaseScore(b.dataset_id));
+
+          html += `
+            <div class="dataset-year-group">
+              <div class="dataset-year-header">${year}</div>
+              <div class="dataset-list">
+                ${groups[year].map(d => `
+                  <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="overflow:hidden;">
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                           onclick="navigator.clipboard.writeText('${d.dataset_id}');showToast('ID copié !')" title="${d.dataset_id}">
+                        ${d.dataset_id}
+                      </div>
+                      <div style="font-size:10px;color:var(--text-dim);">
+                        ${d.phase || '—'} <span style="opacity:0.5;">|</span> ${d.shape?.[0]?.toLocaleString() || '?'} × ${d.shape?.[1] || '?'}
+                      </div>
+                    </div>
+                    <div style="font-size:14px;cursor:pointer;opacity:0.5;margin-left:8px;" onclick="navigator.clipboard.writeText('${d.dataset_id}');showToast('ID copié !')">📋</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        });
+
+        el.innerHTML = html;
+      } catch (e) { console.error(e); }
+    }
+
+    // ── PHASE 1: Import M1 ────────────────────────────────────────────────────────
+    async function importM1() {
+      setLoading('btnImport', true);
+      try {
+        const year = document.getElementById('importYear').value;
+        const data = await callAPI('POST', '/dataset/load_m1', { year });
+        setOutput('out-import', data);
+        showToast(`Dataset M1 ${year} chargé : ${data.result?.shape?.[0]?.toLocaleString()} lignes`);
+        refreshDatasets();
+      } catch (e) {
+        document.getElementById('out-import').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnImport', false);
+      }
+    }
+
+    // ── PHASE 2: Agrégation M15 ───────────────────────────────────────────────────
+    async function aggregateM15() {
+      setLoading('btnAgg', true);
+      try {
+        const id = document.getElementById('aggDatasetId').value.trim();
+        if (!id) throw new Error('Entrez un Dataset ID.');
+        const data = await callAPI('POST', '/m15/aggregate', { dataset_id: id });
+        setOutput('out-agg', data);
+        showToast(`Agrégation réussie : ${data.n_rows?.toLocaleString()} bougies M15`);
+        refreshDatasets();
+      } catch (e) {
+        document.getElementById('out-agg').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnAgg', false);
+      }
+    }
+
+    // ── PHASE 3: Nettoyage M15 ────────────────────────────────────────────────────
+    async function cleanM15() {
+      setLoading('btnClean15', true);
+      try {
+        const id = document.getElementById('clean15DatasetId').value.trim();
+        const threshold = parseFloat(document.getElementById('gapThreshold').value);
+        if (!id) throw new Error('Entrez un Dataset ID.');
+        const data = await callAPI('POST', '/m15/clean', {
+          dataset_id: id,
+          gap_return_threshold: threshold,
+          drop_gaps: true
+        });
+        setOutput('out-clean15', data);
+        showToast(`Nettoyage réussi : ${data.report?.dropped_total || 0} lignes supprimées`);
+        refreshDatasets();
+      } catch (e) {
+        document.getElementById('out-clean15').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnClean15', false);
+      }
+    }
+
+    // ── PHASE 4: Features ─────────────────────────────────────────────────────────
+    async function computeFeatures() {
+      setLoading('btnFeat', true);
+      try {
+        const id = document.getElementById('featDatasetId').value.trim();
+        const addTarget = document.getElementById('addTarget').value === 'true';
+        if (!id) throw new Error('Entrez un Dataset ID.');
+        const data = await callAPI('POST', '/features/compute', {
+          dataset_id: id, drop_na: true, add_target: addTarget
+        });
+        setOutput('out-features', data);
+        showToast(`Features calculées : ${data.n_features} features, ${data.n_rows?.toLocaleString()} lignes`);
+        refreshDatasets();
+      } catch (e) {
+        document.getElementById('out-features').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnFeat', false);
+      }
+    }
+
+    // ── PHASE 5: EDA ──────────────────────────────────────────────────────────────
+    async function runEDA() {
+      setLoading('btnEDA', true);
+      try {
+        const id = document.getElementById('edaDatasetId').value.trim();
+        const type = document.getElementById('edaType').value;
+        if (!id) throw new Error('Entrez un Dataset ID.');
+        const data = await callAPI('GET', `/eda/${type}/${id}`);
+        setOutput('out-eda', data);
+        showToast('Analyse EDA terminée');
+      } catch (e) {
+        document.getElementById('out-eda').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnEDA', false);
+      }
+    }
+
+    // ── PHASE 6: Baseline ─────────────────────────────────────────────────────────
+    async function runBaseline() {
+      setLoading('btnBaseline', true);
+      try {
+        const id = document.getElementById('baselineDatasetId').value.trim();
+        const seed = document.getElementById('baselineSeed').value;
+        if (!id) throw new Error('Entrez un Dataset ID.');
+        const data = await callAPI('GET', `/baseline/compare/${id}`, { seed });
+        renderBaselineTable(data.baselines);
+        setOutput('out-baseline', data);
+        showToast('Comparaison baseline terminée');
+      } catch (e) {
+        document.getElementById('out-baseline').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnBaseline', false);
+      }
+    }
+
+    function renderBaselineTable(baselines) {
+      if (!baselines) return;
+      const rows = Object.entries(baselines).map(([name, m]) => ({
+        name, sharpe: m.sharpe, ret: m.total_return_pct, mdd: m.max_drawdown_pct, pf: m.profit_factor
+      })).sort((a, b) => (b.sharpe || -999) - (a.sharpe || -999));
+
+      document.getElementById('baselineTable').innerHTML = `
+    <table class="compare-table" style="margin-bottom:20px;">
+      <thead><tr>
+        <th>#</th><th>Stratégie</th><th>Sharpe</th><th>Return %</th><th>Max DD %</th><th>Profit Factor</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, i) => `
+          <tr class="${i === 0 ? 'rank-1' : ''}">
+            <td>${i + 1}</td>
+            <td>${r.name}</td>
+            <td class="${r.sharpe > 0 ? 'positive' : 'negative'}">${r.sharpe?.toFixed(2) ?? '—'}</td>
+            <td class="${r.ret > 0 ? 'positive' : 'negative'}">${r.ret?.toFixed(2) ?? '—'}%</td>
+            <td class="negative">${r.mdd?.toFixed(2) ?? '—'}%</td>
+            <td>${r.pf?.toFixed(2) ?? '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+    }
+
+    // ── PHASE 7: ML ───────────────────────────────────────────────────────────────
+    async function trainML() {
+      setLoading('btnML', true);
+      try {
+        const trainId = document.getElementById('mlTrainId').value.trim();
+        const valId = document.getElementById('mlValId').value.trim();
+        const testId = document.getElementById('mlTestId').value.trim();
+        const modelType = document.getElementById('mlModelType').value;
+        if (!trainId || !valId) throw new Error('Train et Val Dataset IDs requis.');
+        const params = { dataset_train_id: trainId, dataset_val_id: valId, model_type: modelType };
+        if (testId) params.dataset_test_id = testId;
+        const data = await callAPI('POST', '/trading_ml/train', params);
+        setOutput('out-ml', data);
+        showToast(`Modèle ${data.model_type} (${data.version}) entraîné — Sharpe val: ${data.metrics?.val?.sharpe}`);
+      } catch (e) {
+        document.getElementById('out-ml').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnML', false);
+      }
+    }
+
+    // ── PHASE 8: RL ───────────────────────────────────────────────────────────────
+    async function trainRL() {
+      setLoading('btnRL', true);
+      try {
+        const trainId = document.getElementById('rlTrainId').value.trim();
+        const valId = document.getElementById('rlValId').value.trim();
+        const episodes = parseInt(document.getElementById('rlEpisodes').value);
+        const seed = parseInt(document.getElementById('rlSeed').value);
+        if (!trainId || !valId) throw new Error('Train et Val Dataset IDs requis.');
+        const data = await callAPI('POST', '/rl/train', {
+          dataset_train_id: trainId, dataset_val_id: valId,
+          n_episodes: episodes, seed
+        });
+        setOutput('out-rl', data);
+        showToast(`Agent Q-Learning entraîné — ${data.agent_info?.n_states_visited} états visités`);
+      } catch (e) {
+        document.getElementById('out-rl').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnRL', false);
+      }
+    }
+
+    async function getRLDesign() {
+      setLoading('btnRLDesign', true);
+      try {
+        const data = await callAPI('GET', '/rl/design');
+        setOutput('out-rl-design', data);
+      } catch (e) {
+        document.getElementById('out-rl-design').textContent = '❌ ' + e.message;
+      } finally {
+        setLoading('btnRLDesign', false);
+      }
+    }
+
+    // ── PHASE 9: Évaluation ───────────────────────────────────────────────────────
+    async function runEvaluation() {
+      setLoading('btnEval', true);
+      try {
+        const id = document.getElementById('evalDatasetId').value.trim();
+        const mlId = document.getElementById('evalMLId').value.trim();
+        if (!id) throw new Error('Dataset ID requis.');
+        const params = {};
+        if (mlId) params.ml_model_id = mlId;
+        const data = await callAPI('GET', `/evaluate/compare/${id}`, params);
+        renderEvalTable(data.ranking_by_sharpe);
+        setOutput('out-eval', data);
+        showToast('Évaluation finale terminée');
+      } catch (e) {
+        document.getElementById('out-eval').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      } finally {
+        setLoading('btnEval', false);
+      }
+    }
+
+    async function runStressTest() {
+      const id = document.getElementById('evalDatasetId').value.trim();
+      if (!id) { showToast('Entrez un Dataset ID.', 'error'); return; }
+      try {
+        const data = await callAPI('GET', `/evaluate/stress_test/${id}`);
+        setOutput('out-eval', data);
+        showToast('Stress test trimestriel terminé');
+      } catch (e) {
+        document.getElementById('out-eval').textContent = '❌ ' + e.message;
+        showToast(e.message, 'error');
+      }
+    }
+
+    function renderEvalTable(ranking) {
+      if (!ranking?.length) return;
+      document.getElementById('evalTable').innerHTML = `
+    <table class="compare-table" style="margin-bottom:20px;">
+      <thead><tr>
+        <th>#</th><th>Stratégie</th><th>Sharpe</th><th>Return %</th><th>Max DD %</th><th>Profit Factor</th>
+      </tr></thead>
+      <tbody>
+        ${ranking.map(r => `
+          <tr class="${r.rank === 1 ? 'rank-1' : ''}">
+            <td>${r.rank}</td>
+            <td>${r.strategy}</td>
+            <td class="${r.sharpe > 0 ? 'positive' : 'negative'}">${r.sharpe?.toFixed(2) ?? '—'}</td>
+            <td class="${r.total_return_pct > 0 ? 'positive' : 'negative'}">${r.total_return_pct?.toFixed(2) ?? '—'}%</td>
+            <td class="negative">${r.max_drawdown_pct?.toFixed(2) ?? '—'}%</td>
+            <td>${r.profit_factor?.toFixed(2) ?? '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────────
+    checkHealth();
+    setInterval(checkHealth, 30000);
+    showPanel('import');
+  </script>
+</body>
+
+</html>
