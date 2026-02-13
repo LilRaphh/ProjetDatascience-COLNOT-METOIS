@@ -18,7 +18,7 @@ from __future__ import annotations
 import random
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Iterator
 
 
 TRANSACTION_COST = 0.0002
@@ -75,6 +75,14 @@ class TradingEnv:
             self.feature_cols = ["_ret1", "_std20"]
 
         self.reset()
+    
+    def _get_close(self, df: pd.DataFrame) -> pd.Series:
+        """Récupère la colonne 'close' existante."""
+        candidates = ["close_15m", "close", "Close"]
+        for c in candidates:
+            if c in df.columns:
+                return df[c]
+        raise ValueError(f"Colonne 'close' introuvable dans le DataFrame. Colonnes: {list(df.columns)}")
 
     def reset(self) -> np.ndarray:
         self.t = WINDOW_SIZE
@@ -252,89 +260,106 @@ class RLService:
     Walk-forward : train 2022 / val 2023 / test 2024.
     """
 
-    def train(
+    def train_gen(
         self,
         df_train: pd.DataFrame,
         df_val: pd.DataFrame,
         df_test: Optional[pd.DataFrame] = None,
         n_episodes: int = 10,
         seed: int = 42,
-    ) -> Dict[str, Any]:
+    ) -> Iterator[Dict[str, Any]]:
         """
-        Entraîne l'agent et retourne les métriques.
-
-        Parameters
-        ----------
-        n_episodes : nombre d'épisodes d'entraînement sur df_train
-                     (>= 5 recommandé, >= 20 pour meilleure convergence)
+        Entraîne l'agent et yield des événements de progression.
         """
-        random.seed(seed)
-        np.random.seed(seed)
+        try:
+            random.seed(seed)
+            np.random.seed(seed)
 
-        env_train = TradingEnv(df_train)
-        agent = QLearningAgent(state_dim=env_train._state_dim())
+            env_train = TradingEnv(df_train)
+            agent = QLearningAgent(state_dim=env_train._state_dim())
 
-        train_rewards: List[float] = []
-        train_equities: List[float] = []
+            train_rewards: List[float] = []
+            train_equities: List[float] = []
 
-        for ep in range(n_episodes):
-            state = env_train.reset()
-            ep_reward = 0.0
+            for ep in range(n_episodes):
+                state = env_train.reset()
+                ep_reward = 0.0
 
-            while True:
-                action = agent.act(state)
-                next_state, reward, done, _ = env_train.step(action)
-                agent.learn(state, action, reward, next_state, done)
-                ep_reward += reward
-                state = next_state
-                if done:
-                    break
+                while True:
+                    action = agent.act(state)
+                    next_state, reward, done, _ = env_train.step(action)
+                    agent.learn(state, action, reward, next_state, done)
+                    ep_reward += reward
+                    state = next_state
+                    if done:
+                        break
 
-            agent.decay_epsilon()
-            train_rewards.append(round(ep_reward, 4))
-            train_equities.append(round(env_train.equity, 4))
+                agent.decay_epsilon()
+                train_rewards.append(round(ep_reward, 4))
+                train_equities.append(round(env_train.equity, 4))
 
-        # ── Évaluation validation ──────────────────────────────────────────────
-        val_metrics = self._evaluate(agent, df_val)
-        test_metrics = self._evaluate(agent, df_test) if df_test is not None else {}
+                # Yield progress event
+                yield {
+                    "type": "progress",
+                    "episode": ep + 1,
+                    "total_episodes": n_episodes,
+                    "reward": round(ep_reward, 4),
+                    "equity": round(env_train.equity, 4),
+                    "epsilon": round(agent.epsilon, 4),
+                }
 
-        model_id = f"rl_qlearning_{n_episodes}ep_{seed}seed"
-        model_data = {
-            "model_id": model_id,
-            "algorithm": "Q-Learning (tabulaire)",
-            "hyperparams": {
-                "gamma": GAMMA,
-                "alpha": ALPHA,
-                "epsilon_start": EPSILON_START,
-                "epsilon_min": EPSILON_MIN,
-                "epsilon_decay": EPSILON_DECAY,
-                "n_episodes": n_episodes,
-                "window_size": WINDOW_SIZE,
-                "seed": seed,
-            },
-            "agent_info": agent.info(),
-            "train_rewards_per_episode": train_rewards,
-            "train_final_equities": train_equities,
-            "metrics": {
-                "train": {
-                    "mean_reward_per_episode": round(float(np.mean(train_rewards)), 4),
-                    "final_equity": train_equities[-1] if train_equities else 1.0,
+            # ── Évaluation validation ──────────────────────────────────────────────
+            val_metrics = self._evaluate(agent, df_val)
+            test_metrics = self._evaluate(agent, df_test) if df_test is not None else {}
+
+            model_id = f"rl_qlearning_{n_episodes}ep_{seed}seed"
+            model_data = {
+                "model_id": model_id,
+                "algorithm": "Q-Learning (tabulaire)",
+                "hyperparams": {
+                    "gamma": GAMMA,
+                    "alpha": ALPHA,
+                    "epsilon_start": EPSILON_START,
+                    "epsilon_min": EPSILON_MIN,
+                    "epsilon_decay": EPSILON_DECAY,
+                    "n_episodes": n_episodes,
+                    "window_size": WINDOW_SIZE,
+                    "seed": seed,
                 },
-                "val": val_metrics,
-                "test": test_metrics,
-            },
-            "_agent": agent,
-        }
+                "agent_info": agent.info(),
+                "train_rewards_per_episode": train_rewards,
+                "train_final_equities": train_equities,
+                "metrics": {
+                    "train": {
+                        "mean_reward_per_episode": round(float(np.mean(train_rewards)), 4),
+                        "final_equity": train_equities[-1] if train_equities else 1.0,
+                    },
+                    "val": val_metrics,
+                    "test": test_metrics,
+                },
+                "_agent": agent,
+            }
 
-        global _BEST_RL_ID
-        _RL_MODELS[model_id] = model_data
-        if _BEST_RL_ID is None or (
-            val_metrics.get("sharpe", -999)
-            > _RL_MODELS.get(_BEST_RL_ID, {}).get("metrics", {}).get("val", {}).get("sharpe", -999)
-        ):
-            _BEST_RL_ID = model_id
+            global _BEST_RL_ID
+            _RL_MODELS[model_id] = model_data
+            if _BEST_RL_ID is None or (
+                val_metrics.get("sharpe", -999)
+                > _RL_MODELS.get(_BEST_RL_ID, {}).get("metrics", {}).get("val", {}).get("sharpe", -999)
+            ):
+                _BEST_RL_ID = model_id
 
-        return self._serializable(model_data)
+            yield {
+                "type": "result",
+                "payload": self._serializable(model_data)
+            }
+
+        except Exception as e:
+            yield {
+                "type": "error",
+                "message": str(e)
+            }
+            # Re-raise pour logging serveur si besoin, mais le yield error suffit pour le client
+            raise e
 
     def _evaluate(
         self,

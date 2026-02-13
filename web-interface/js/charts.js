@@ -169,3 +169,55 @@ function renderEvalChart(strategies) {
         }
     });
 }
+
+function renderRLTrainingChart(episodes, rewards, equities) {
+    document.getElementById('rlChartContainer').style.display = 'block';
+
+    // Si déjà existant, on peut juste update les data sans tout recréer si on stockait l'instance
+    // Mais renderChart détruit l'instance existante, ce qui est "safe" mais moins performant pour du temps réel rapide.
+    // Vu que c'est step par step (quelques secondes), c'est acceptable.
+
+    renderChart('chartRLTraining', 'bar', {
+        labels: episodes,
+        datasets: [
+            {
+                label: 'Reward',
+                data: rewards,
+                backgroundColor: 'rgba(0, 212, 255, 0.5)',
+                yAxisID: 'y',
+                order: 2
+            },
+            {
+                label: 'Equity',
+                data: equities,
+                type: 'line',
+                borderColor: '#00ff88',
+                backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                borderWidth: 2,
+                pointRadius: 2,
+                yAxisID: 'y1',
+                order: 1,
+                fill: false,
+                tension: 0.1
+            }
+        ]
+    }, {
+        animation: false, // Désactiver l'animation pour les updates fréquents
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Reward' },
+                grid: { color: 'rgba(30, 45, 71, 0.5)' }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Equity' },
+                grid: { drawOnChartArea: false }
+            }
+        }
+    });
+}
