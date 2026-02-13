@@ -56,6 +56,10 @@ class EDAService:
                 "p_value": float(shapiro_p),
                 "is_normal_95": bool(shapiro_p > 0.05),
             },
+            "histogram": {
+                "counts": np.histogram(returns, bins=50)[0].tolist(),
+                "bins": np.histogram(returns, bins=50)[1].tolist(),
+            }
         }
 
     def analyse_volatility(self, df: pd.DataFrame, window: int = 96) -> Dict[str, Any]:
